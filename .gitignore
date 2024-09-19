@@ -1,0 +1,7 @@
+*.pyc
+*.pt
+*.DS_Store
+
+__pycache__/
+gradio_cached_examples/
+checkpoint-*

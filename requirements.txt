@@ -1,0 +1,7 @@
+diffusers==0.30.3
+gradio==4.44.0
+matplotlib==3.8.4
+numpy==1.26.4
+Pillow==10.4.0
+skimage==0.0
+ultralytics==8.2.97
