@@ -1,21 +1,3 @@
----
-license: apache-2.0
-tags:
-  - vision
-  - image-classification
-widget:
-  - src: >-
-      https://huggingface.co/jordandavis/yolo-human-parse/blob/main/sample_images/image_one.jpg
-    example_title: Straight ahead
-  - src: >-
-      Looking back
-    example_title: Teapot
-  - src: >-
-      https://huggingface.co/jordandavis/yolo-human-parse/blob/main/sample_images/image_three.jpg
-    example_title: Sweats
----
-
-
 <div align="left">
 <h1>YOLO Segmentation Model for Human Body Parts and Objects
 </h1>
