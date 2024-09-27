@@ -1,99 +1,37 @@
 import gradio as gr
 import os
-from ultralytics import YOLO
-from hp.BodyMask import BodyMask
+from hp.yolo_results import YOLOResults
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches
-from skimage.transform import resize
 from PIL import Image
 import io
+from functools import lru_cache
+import logging
+from ultralytics import YOLO
+from hp.utils import load_resize_image
 
-model_id = os.path.abspath("weights/yolo-human-parse-epoch-125.pt")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-
-def display_image_with_masks(image, results, cols=4):
-    # Convert PIL Image to numpy array
-    image_np = np.array(image)
-
-    # Check image dimensions
-    if image_np.ndim != 3 or image_np.shape[2] != 3:
-        raise ValueError("Image must be a 3-dimensional array with 3 color channels")
-
-    # Number of masks
-    n = len(results)
-    rows = (n + cols - 1) // cols  # Calculate required number of rows
-
-    # Setting up the plot
-    fig, axs = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows))
-    axs = np.array(axs).reshape(-1)  # Flatten axs array for easy indexing
-
-    for i, result in enumerate(results):
-        mask = result["mask"]
-        label = result["label"]
-        score = float(result["score"])
-
-        # Convert PIL mask to numpy array and resize if necessary
-        mask_np = np.array(mask)
-        if mask_np.shape != image_np.shape[:2]:
-            mask_np = resize(
-                mask_np, image_np.shape[:2], mode="constant", anti_aliasing=False
-            )
-            mask_np = (mask_np > 0.5).astype(
-                np.uint8
-            )  # Threshold back to binary after resize
-
-        # Create an overlay where mask is True
-        overlay = np.zeros_like(image_np)
-        overlay[mask_np > 0] = [0, 0, 255]  # Applying blue color on the mask area
-
-        # Combine the image and the overlay
-        combined = image_np.copy()
-        indices = np.where(mask_np > 0)
-        combined[indices] = combined[indices] * 0.5 + overlay[indices] * 0.5
-
-        # Show the combined image
-        ax = axs[i]
-        ax.imshow(combined)
-        ax.axis("off")
-        ax.set_title(f"Label: {label}, Score: {score:.2f}", fontsize=12)
-        rect = patches.Rectangle(
-            (0, 0),
-            image_np.shape[1],
-            image_np.shape[0],
-            linewidth=1,
-            edgecolor="r",
-            facecolor="none",
-        )
-        ax.add_patch(rect)
-
-    # Hide unused subplots if the total number of masks is not a multiple of cols
-    for idx in range(i + 1, rows * cols):
-        axs[idx].axis("off")
-
-    plt.tight_layout()
-
-    # Save the plot to a bytes buffer
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png")
-    buf.seek(0)
-
-    # Clear the current figure
-    plt.close(fig)
-
-    return buf
+model_id = os.path.abspath("weights/yolo-human-parse-v2.pt")
 
 
-def perform_segmentation(input_image):
-    bm = BodyMask(input_image, model_id=model_id, resize_to=640)
-    if bm.body_mask is None:
-        return input_image  # Return the original image if no mask is found
-    results = bm.results
-    buf = display_image_with_masks(input_image, results)
+@lru_cache
+def get_model(model_id=model_id):
+    return YOLO(model_id, task="segment")
 
-    # Convert BytesIO to PIL Image
-    img = Image.open(buf)
-    return img
+
+def perform_segmentation(image):
+    model = get_model()
+    image = load_resize_image(image, 1024)
+    imgsz = max(image.size)
+    result = model(image, imgsz=imgsz, retina_masks=True)
+    if not bool(result):
+        logger.info("No Masks or Boxes Found")
+        return image
+    result = YOLOResults(image, result)
+    return result.visualize(return_image=True)
 
 
 # Get example images
